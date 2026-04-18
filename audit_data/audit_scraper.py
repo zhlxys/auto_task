@@ -5,37 +5,98 @@ from datetime import datetime
 import docx
 import re
 
-def search_audit_info():
-    search_terms = ["审计资料", "audit information", "审计报告", "audit report"]
+# 国内审计官网和监管机构列表
+audit_websites = [
+    {"name": "中国注册会计师协会", "url": "https://www.cicpa.org.cn/"},
+    {"name": "财政部", "url": "https://www.mof.gov.cn/"},
+    {"name": "审计署", "url": "https://www.audit.gov.cn/"},
+    {"name": "证监会", "url": "https://www.csrc.gov.cn/"},
+    {"name": "银保监会", "url": "https://www.cbirc.gov.cn/"}
+]
+
+def get_website_content(website):
     results = []
-    
-    for term in search_terms:
-        try:
-            # 使用Bing搜索
-            url = f"https://www.bing.com/search?q={term}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            response = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # 提取搜索结果
-            for item in soup.select('li.b_algo')[:5]:  # 取前5个结果
-                title = item.select_one('h2 a').text if item.select_one('h2 a') else ""
-                link = item.select_one('h2 a')['href'] if item.select_one('h2 a') else ""
-                snippet = item.select_one('p').text if item.select_one('p') else ""
-                
-                if title and link:
-                    results.append({
-                        "title": title,
-                        "link": link,
-                        "snippet": snippet,
-                        "search_term": term
-                    })
-        except Exception as e:
-            print(f"搜索 {term} 时出错: {e}")
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Connection": "keep-alive"
+        }
+        # 禁用SSL验证，解决可能的SSL错误
+        response = requests.get(website["url"], headers=headers, timeout=15, verify=False)
+        response.encoding = response.apparent_encoding
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 尝试多种常见的新闻列表选择器
+        common_selectors = [
+            '.news-list li',
+            '.news_box li',
+            '.news-list-item',
+            '.list li',
+            '.news_list li',
+            'ul[class*=news] li',
+            'div[class*=news] li',
+            'li[class*=news]',
+            'a[href]'
+        ]
+        
+        # 尝试所有选择器，直到找到结果
+        for selector in common_selectors:
+            items = soup.select(selector)[:15]  # 取更多结果
+            if items:
+                for item in items:
+                    # 处理不同的结构
+                    if item.name == 'a':
+                        title_elem = item
+                    else:
+                        title_elem = item.select_one('a')
+                    
+                    if title_elem:
+                        title = title_elem.text.strip()
+                        link = title_elem.get('href', '')
+                        if link:
+                            if not link.startswith('http'):
+                                link = website["url"] + link
+                            results.append({
+                                "title": title,
+                                "link": link,
+                                "source": website["name"]
+                            })
+                if len(results) >= 10:  # 足够的结果
+                    break
+    except Exception as e:
+        print(f"获取 {website['name']} 内容时出错: {e}")
     
     return results
+
+def search_audit_info():
+    results = []
+    
+    # 从各个审计官网和监管机构获取内容
+    for website in audit_websites:
+        website_results = get_website_content(website)
+        results.extend(website_results)
+    
+    # 过滤出与审计相关的内容
+    audit_keywords = ["审计", "audit", "准则", "指引", "报告", "regulation", "standard", "guideline", "监督", "检查", "review", "assurance"]
+    filtered_results = []
+    
+    for result in results:
+        if result.get("title"):
+            title_lower = result["title"].lower()
+            if any(keyword.lower() in title_lower for keyword in audit_keywords):
+                filtered_results.append(result)
+    
+    # 去重
+    seen_titles = set()
+    unique_results = []
+    for result in filtered_results:
+        if result["title"] not in seen_titles:
+            seen_titles.add(result["title"])
+            unique_results.append(result)
+    
+    return unique_results
 
 def fetch_content(url):
     try:
@@ -58,28 +119,43 @@ def fetch_content(url):
         print(f"获取 {url} 内容时出错: {e}")
         return ""
 
-def generate_doc(results, output_path):
-    doc = docx.Document()
-    doc.add_heading('审计相关资料汇总', 0)
-    doc.add_paragraph(f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-    doc.add_paragraph()
+def generate_doc(results):
+    today = datetime.now().strftime("%Y%m%d")
+    saved_files = []
     
-    for i, result in enumerate(results, 1):
-        doc.add_heading(f'资料 {i}', level=1)
-        doc.add_paragraph(f'标题: {result["title"]}')
-        doc.add_paragraph(f'链接: {result["link"]}')
-        doc.add_paragraph(f'搜索词: {result["search_term"]}')
-        doc.add_paragraph(f'摘要: {result["snippet"]}')
-        
-        # 获取详细内容
-        content = fetch_content(result["link"])
-        if content:
-            doc.add_heading('详细内容', level=2)
-            doc.add_paragraph(content)
-        
-        doc.add_page_break()
+    for result in results:
+        try:
+            # 清理标题中的特殊字符，确保文件名有效
+            safe_title = re.sub(r'[\\/:*?"<>|]', '_', result["title"])
+            # 限制标题长度
+            safe_title = safe_title[:50]
+            
+            # 生成文件名: YYYYMMDD_来源_标题.doc
+            filename = f"{today}_{result['source']}_{safe_title}.doc"
+            output_path = os.path.join(os.path.dirname(__file__), filename)
+            
+            # 创建文档
+            doc = docx.Document()
+            doc.add_heading(result["title"], 0)
+            doc.add_paragraph(f'来源: {result["source"]}')
+            doc.add_paragraph(f'链接: {result["link"]}')
+            doc.add_paragraph(f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            doc.add_paragraph()
+            
+            # 获取详细内容
+            content = fetch_content(result["link"])
+            if content:
+                doc.add_heading('详细内容', level=1)
+                doc.add_paragraph(content)
+            
+            # 保存文档
+            doc.save(output_path)
+            saved_files.append(output_path)
+            print(f"已保存: {filename}")
+        except Exception as e:
+            print(f"生成文档时出错: {e}")
     
-    doc.save(output_path)
+    return saved_files
 
 def main():
     # 搜索审计相关信息
@@ -90,16 +166,13 @@ def main():
         print("未找到相关资料")
         return
     
-    # 生成文件名
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"audit_data_{timestamp}.docx"
-    output_path = os.path.join(os.path.dirname(__file__), output_file)
-    
     # 生成文档
-    print(f"正在生成文档: {output_file}")
-    generate_doc(results, output_path)
+    print("正在生成文档...")
+    saved_files = generate_doc(results)
     
-    print(f"任务完成！文档已保存至: {output_path}")
+    print(f"任务完成！共保存 {len(saved_files)} 个文档")
+    for file in saved_files:
+        print(f"- {os.path.basename(file)}")
 
 if __name__ == "__main__":
     main()
