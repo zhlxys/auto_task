@@ -5,13 +5,19 @@ from datetime import datetime
 import docx
 import re
 
-# 国内审计官网和监管机构列表
+# 国内审计官网、监管机构和国际四大会计师事务所列表
 audit_websites = [
+    # 国内机构
     {"name": "中国注册会计师协会", "url": "https://www.cicpa.org.cn/"},
     {"name": "财政部", "url": "https://www.mof.gov.cn/"},
     {"name": "审计署", "url": "https://www.audit.gov.cn/"},
     {"name": "证监会", "url": "https://www.csrc.gov.cn/"},
-    {"name": "银保监会", "url": "https://www.cbirc.gov.cn/"}
+    {"name": "银保监会", "url": "https://www.cbirc.gov.cn/"},
+    # 国际四大会计师事务所
+    {"name": "普华永道", "url": "https://www.pwc.com/"},
+    {"name": "德勤", "url": "https://www.deloitte.com/"},
+    {"name": "安永", "url": "https://www.ey.com/"},
+    {"name": "毕马威", "url": "https://www.kpmg.com/"}
 ]
 
 def get_website_content(website):
