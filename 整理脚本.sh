@@ -15,7 +15,7 @@ find "$SRC_DIR" -type f | while read file; do
     # 根据扩展名分类
     case "$ext" in
         # 文档类型
-        doc|docx|txt|pdf|ppt|pptx|xls|xlsx|md|rtf|odt|ods|odp) 
+        doc|docx|txt|pdf|ppt|pptx|xls|xlsx|csv|md|rtf|odt|ods|odp) 
             dest_subdir="文档"
             ;;
         # 图片类型
