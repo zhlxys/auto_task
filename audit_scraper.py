@@ -23,6 +23,26 @@ AUDIT_SOURCES = [
         "name": "中注协",
         "url": "http://www.cicpa.org.cn/",
         "base_url": "http://www.cicpa.org.cn"
+    },
+    {
+        "name": "普华永道",
+        "url": "https://www.pwccn.com/zh/home.html",
+        "base_url": "https://www.pwccn.com"
+    },
+    {
+        "name": "德勤",
+        "url": "https://www2.deloitte.com/cn/zh.html",
+        "base_url": "https://www2.deloitte.com"
+    },
+    {
+        "name": "安永",
+        "url": "https://www.ey.com/zh_cn",
+        "base_url": "https://www.ey.com"
+    },
+    {
+        "name": "毕马威",
+        "url": "https://home.kpmg/cn/zh/home.html",
+        "base_url": "https://home.kpmg"
     }
 ]
 
@@ -59,7 +79,7 @@ def extract_audit_info(source, html):
         text = link.get_text(strip=True)
         href = link["href"]
         
-        keywords = ["审计", "准则", "规范", "指引", "公告", "通知", "规定", "办法"]
+        keywords = ["审计", "准则", "规范", "指引", "公告", "通知", "规定", "办法", "audit", "standard", "guidance", "insight", "report", "update", "news"]
         if any(keyword in text for keyword in keywords):
             if not href.startswith("http"):
                 if href.startswith("/"):
